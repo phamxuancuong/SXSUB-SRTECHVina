@@ -1,0 +1,155 @@
+{
+  "FRONT": [
+    {
+      "colType": "year",
+      "year": 2025,
+      "month": 1,
+      "week": 1,
+      "date": "",
+      "label": "Năm 2025",
+      "salesPerson": 28.0942,
+      "labor": 220517.0,
+      "qty": 14185163.0,
+      "st": 51651191.29,
+      "sales": 6195246.34
+    },
+    {
+      "colType": "month",
+      "year": 2025,
+      "month": 1,
+      "week": 1,
+      "date": "",
+      "label": "T1/2025",
+      "salesPerson": 27.1328,
+      "labor": 9648.0,
+      "qty": 712593.0,
+      "st": 2264506.54,
+      "sales": 261776.96
+    },
+    {
+      "colType": "year",
+      "year": 2026,
+      "month": 12,
+      "week": 53,
+      "date": "",
+      "label": "Năm 2026",
+      "salesPerson": 29.2219,
+      "labor": 192773.58,
+      "qty": 12491738.0,
+      "st": 43338437.15,
+      "sales": 5633211.43
+    }
+  ],
+  "PRE_FRONT": [
+    {
+      "colType": "year",
+      "year": 2025,
+      "month": 1,
+      "week": 1,
+      "date": "",
+      "label": "Năm 2025",
+      "salesPerson": 22.5159,
+      "labor": 12547.0,
+      "qty": 276695.0,
+      "st": 1778161.54,
+      "sales": 282507.56
+    },
+    {
+      "colType": "year",
+      "year": 2026,
+      "month": 12,
+      "week": 53,
+      "date": "",
+      "label": "Năm 2026",
+      "salesPerson": 25.5133,
+      "labor": 36237.14,
+      "qty": 774741.0,
+      "st": 5569239.82,
+      "sales": 924530.48
+    }
+  ],
+  "BGL_SUB_UB": [
+    {
+      "colType": "year",
+      "year": 2025,
+      "month": 1,
+      "week": 1,
+      "date": "",
+      "label": "Năm 2025",
+      "salesPerson": 24.0755,
+      "labor": 15889.0,
+      "qty": 1351880.0,
+      "st": 3268098.77,
+      "sales": 382536.27
+    },
+    {
+      "colType": "year",
+      "year": 2026,
+      "month": 12,
+      "week": 53,
+      "date": "",
+      "label": "Năm 2026",
+      "salesPerson": 6.156,
+      "labor": 29586.5,
+      "qty": 2452448.0,
+      "st": 1386579.43,
+      "sales": 182134.95
+    }
+  ],
+  "OTHER": [
+    {
+      "colType": "year",
+      "year": 2025,
+      "month": 1,
+      "week": 1,
+      "date": "",
+      "label": "Năm 2025",
+      "salesPerson": 28.9225,
+      "labor": 49850.0,
+      "qty": 35853044.18,
+      "st": 12079112.13,
+      "sales": 1441786.31
+    },
+    {
+      "colType": "year",
+      "year": 2026,
+      "month": 12,
+      "week": 53,
+      "date": "",
+      "label": "Năm 2026",
+      "salesPerson": 30.0167,
+      "labor": 32316.18,
+      "qty": 17649189.0,
+      "st": 7523961.41,
+      "sales": 970025.94
+    }
+  ],
+  "SUB": [
+    {
+      "colType": "year",
+      "year": 2025,
+      "month": 1,
+      "week": 1,
+      "date": "",
+      "label": "Năm 2025",
+      "salesPerson": 27.7107,
+      "labor": 299228.0,
+      "qty": 51620526.18,
+      "st": 68843268.21,
+      "sales": 8291807.26
+    },
+    {
+      "colType": "month",
+      "year": 2025,
+      "month": 1,
+      "week": 1,
+      "date": "",
+      "label": "T1/2025",
+      "salesPerson": 27.2507,
+      "labor": 15925.0,
+      "qty": 5263598.33,
+      "st": 3754045.47,
+      "sales": 433967.66
+    }
+  ]
+}

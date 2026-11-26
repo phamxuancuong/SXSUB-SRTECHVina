@@ -1,0 +1,47 @@
+{
+  "ontime": [
+    {
+      "year": 2026,
+      "month": 11,
+      "week": 46,
+      "date": "2026-11-13",
+      "dow": "Fri",
+      "plan": 2150000,
+      "ok": 2150000,
+      "ng": 0,
+      "rate": 1,
+      "status": "ON"
+    }
+  ],
+  "ckd_pcell": [
+    {
+      "year": 2026,
+      "month": 11,
+      "week": 46,
+      "date": "2026-11-13",
+      "dow": "Fri",
+      "plan": 45115,
+      "ok": 45115,
+      "ng": 0,
+      "rate": 1,
+      "status": "ON"
+    }
+  ],
+  "ml_svc": [
+    {
+      "year": 2026,
+      "month": 11,
+      "week": 46,
+      "date": "2026-11-13",
+      "dow": "Fri",
+      "plan": 32514,
+      "ok": 32514,
+      "ng": 0,
+      "rate": 1,
+      "status": "ON"
+    }
+  ],
+  "po_ontime": [],
+  "po_ckd_pcell": [],
+  "po_svc": []
+}
