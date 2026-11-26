@@ -1359,6 +1359,19 @@ function getKpiColorClass(val, target) {
 /* =========================================================================
    TAB 2: KPI SX SUB
    ========================================================================= */
+function formatDeltaPct(diffRatio) {
+    if (diffRatio === null || diffRatio === undefined || Number.isNaN(diffRatio)) {
+      return { text: "-", color: "#64748b" };
+    }
+    const pctStr = formatPct(Math.abs(diffRatio));
+    if (diffRatio > 0) {
+      return { text: `+${pctStr}`, color: "#16a34a" }; // Xanh khi cao hơn / tăng
+    }
+    if (diffRatio < 0) {
+      return { text: `-${pctStr}`, color: "#dc2626" }; // Đỏ khi thấp hơn / giảm
+    }
+    return { text: pctStr, color: "#0f172a" }; // Bằng nhau (0%)
+  }
 function renderTab2KPI() {
   if (!KPI_DB) {
     KPI_DB = loadKpiFromStorageOrFallback();
@@ -1408,6 +1421,15 @@ function renderTab2KPI() {
     const yOk = yearRows.reduce((s, r) => s + (r.ok || 0), 0);
     const yRate = yPlan > 0 ? yOk / yPlan : 0;
 
+    const targetVal = parseFloat(cat.targetText) / 100 || 1;
+    const nextTargetVal = parseFloat(cat.targetText) / 100 || 1;
+
+    const wDelta = targetVal > 0 ? (wRate - targetVal) / targetVal : null;
+    const nextDelta = wRate > 0 ? (nextTargetVal - wRate) / wRate : null;
+
+    const wDeltaInfo = formatDeltaPct(wDelta);
+    const nextDeltaInfo = formatDeltaPct(nextDelta);
+
     const wCls = getRateClass(wRate);
     const yCls = getRateClass(yRate);
 
@@ -1418,12 +1440,12 @@ function renderTab2KPI() {
         <td class="cell-link ${wCls}" onclick="openCategoryChart('${cat.key}', '${cat.label}', 'overview')">
           ${formatPct(wRate)}
         </td>
-        <td class="fw-bold ${wCls}">${formatPct(wRate)}</td>
+        <td class="fw-bold" style="color:${wDeltaInfo.color};">${wDeltaInfo.text}</td>
+        <td class="fw-bold">${cat.targetText}</td>
+        <td class="fw-bold" style="color:${nextDeltaInfo.color};">${nextDeltaInfo.text}</td>
         <td class="cell-link ${yCls}" onclick="openCategoryChart('${cat.key}', '${cat.label}', 'overview')">
           ${formatPct(yRate)}
         </td>
-        <td class="fw-bold ${yCls}">${formatPct(yRate)}</td>
-        <td class="fw-bold">${cat.targetText}</td>
       </tr>
     `;
   }).join("");
@@ -1433,6 +1455,19 @@ function renderTab2KPI() {
 
   const subTarget = Number(KPI_DB.targets?.sub_week || 28);
   const totalTarget = Number(KPI_DB.targets?.total_week || 30);
+
+  const nextWeekTargetNum = Number(nextWeekTargetText) || 0;
+
+  const subWDelta = (subStats.wAvg > 0 && subTarget > 0) ? ((subStats.wAvg - subTarget) / subTarget) : null;
+  const subNextDelta = (subStats.wAvg > 0 && nextWeekTargetNum > 0) ? ((nextWeekTargetNum - subStats.wAvg) / subStats.wAvg) : null;
+
+  const totWDelta = (totalStats.wAvg > 0 && totalTarget > 0) ? ((totalStats.wAvg - totalTarget) / totalTarget) : null;
+  const totNextDelta = (totalStats.wAvg > 0 && nextWeekTargetNum > 0) ? ((nextWeekTargetNum - totalStats.wAvg) / totalStats.wAvg) : null;
+
+  const subWDeltaInfo = formatDeltaPct(subWDelta);
+  const subNextDeltaInfo = formatDeltaPct(subNextDelta);
+  const totWDeltaInfo = formatDeltaPct(totWDelta);
+  const totNextDeltaInfo = formatDeltaPct(totNextDelta);
 
   const subWCls = getKpiColorClass(subStats.wAvg, subTarget);
   const subYCls = getKpiColorClass(subStats.yAvg, subTarget);
@@ -1446,12 +1481,12 @@ function renderTab2KPI() {
       <td class="cell-link ${subWCls}" onclick="openKpiLineChart('sub_person', 'Sale Per Son SUB', 'overview')">
         ${subStats.wAvg > 0 ? formatDec(subStats.wAvg, 2) : "-"}
       </td>
-      <td class="fw-bold ${subWCls}">${subStats.wAvg > 0 ? formatDec(subStats.wAvg, 2) : "-"}</td>
+      <td class="fw-bold" style="color:${subWDeltaInfo.color};">${subWDeltaInfo.text}</td>
+      <td class="fw-bold">${nextWeekTargetText}</td>
+      <td class="fw-bold" style="color:${subNextDeltaInfo.color};">${subNextDeltaInfo.text}</td>
       <td class="cell-link ${subYCls}" onclick="openKpiLineChart('sub_person', 'Sale Per Son SUB', 'overview')">
         ${subStats.yAvg > 0 ? formatDec(subStats.yAvg, 2) : "-"}
       </td>
-      <td class="fw-bold ${subYCls}">${subStats.yAvg > 0 ? formatDec(subStats.yAvg, 2) : "-"}</td>
-      <td class="fw-bold">${nextWeekTargetText}</td>
     </tr>
     <tr>
       <td class="fw-bold text-left">Sale Per Son SUB Total</td>
@@ -1459,12 +1494,12 @@ function renderTab2KPI() {
       <td class="cell-link ${totWCls}" onclick="openKpiLineChart('sub_total', 'Sale Per Son SUB Total', 'overview')">
         ${totalStats.wAvg > 0 ? formatDec(totalStats.wAvg, 2) : "-"}
       </td>
-      <td class="fw-bold ${totWCls}">${totalStats.wAvg > 0 ? formatDec(totalStats.wAvg, 2) : "-"}</td>
+      <td class="fw-bold" style="color:${totWDeltaInfo.color};">${totWDeltaInfo.text}</td>
+      <td class="fw-bold">${nextWeekTargetText}</td>
+      <td class="fw-bold" style="color:${totNextDeltaInfo.color};">${totNextDeltaInfo.text}</td>
       <td class="cell-link ${totYCls}" onclick="openKpiLineChart('sub_total', 'Sale Per Son SUB Total', 'overview')">
         ${totalStats.yAvg > 0 ? formatDec(totalStats.yAvg, 2) : "-"}
       </td>
-      <td class="fw-bold ${totYCls}">${totalStats.yAvg > 0 ? formatDec(totalStats.yAvg, 2) : "-"}</td>
-      <td class="fw-bold">${nextWeekTargetText}</td>
     </tr>
     <tr>
       <td class="fw-bold text-left">Hiệu suất Model</td>
@@ -1484,10 +1519,13 @@ function renderTab2KPI() {
               <th>Hạng mục</th>
               <th>Mục tiêu</th>
               <th>Kết quả W${latestWeek}</th>
-              <th>Tỷ lệ Đạt (Tuần)</th>
+              <th>Tỷ lệ Đạt W${latestWeek}</th>
+              
+              
+              <th>MỤC TIÊU W${nextWeek}</th>
+              <th>Tỷ lệ Mục tiêu W${nextWeek}</th>
               <th>Kết quả năm ${latestYear}</th>
-              <th>Tỷ lệ Đạt (Năm)</th>
-              <th>MỤC TIÊU WEEK ${nextWeek}</th>
+
             </tr>
           </thead>
           <tbody>
