@@ -895,7 +895,7 @@ function renderCategoryChart(state) {
         <input type="date" id="inpFromDate" class="date-input" value="${fromDate}" onchange="applyCustomDateRange()" />
         <span style="font-size:13px;font-weight:700;">Đến ngày:</span>
         <input type="date" id="inpToDate" class="date-input" value="${toDate}" onchange="applyCustomDateRange()" />
-        <button class="mode-btn" onclick="resetCustomDateRange()">Mặc định 7 mốc gần nhất</button>
+        
       </div>
 
       <div class="chart-canvas-box">
@@ -1657,8 +1657,8 @@ function renderKpiLineChart(state) {
         const cx = getX(p.idx);
         const cy = getY(p.val);
         pathsSvg += `
-          <g style="cursor:pointer;" onclick="event.stopPropagation(); openKpiStatsTable(${p.idx})">
-            <circle cx="${cx}" cy="${cy}" r="5" fill="${line.color}" />
+          <g style="cursor:pointer;" onclick="event.stopPropagation(); openKpiStatsTable(${p.idx}, '${line.key}', '${line.label}')">
+            <circle cx="${cx}" cy="${cy}" r="6" fill="${line.color}" stroke="#ffffff" stroke-width="1.5" />
             <text x="${cx}" y="${cy - 9}" text-anchor="middle" font-size="11" font-weight="700" fill="${line.color}">${p.val.toFixed(1)}</text>
           </g>
         `;
@@ -1696,7 +1696,7 @@ function renderKpiLineChart(state) {
         <input type="date" id="kpiFromDate" class="date-input" value="${fromDate}" onchange="applyKpiCustomDateRange()" />
         <span style="font-size:13px;font-weight:700;">Đến ngày:</span>
         <input type="date" id="kpiToDate" class="date-input" value="${toDate}" onchange="applyKpiCustomDateRange()" />
-        <button class="mode-btn" onclick="resetKpiCustomDateRange()">Mặc định 7 mốc gần nhất</button>
+        
       </div>
 
       <div class="chart-canvas-box" style="justify-content:flex-start;">
@@ -1736,43 +1736,138 @@ function resetKpiCustomDateRange() {
   renderKpiLineChart(current.state);
 }
 
-function openKpiStatsTable(selectedIdx) {
+function openKpiStatsTable(selectedIdx, selectedKey = "", selectedLabel = "") {
   const current = viewStack[viewStack.length - 1];
   const { kpiType, kpiLabel, currentLabels, currentLinesData } = current.state;
+  const lines = currentLinesData || [];
+  const defaultLine = lines[lines.length - 1] || null;
+
   pushView(renderKpiStatsTable, {
     kpiType,
     kpiLabel,
     labels: currentLabels || [],
-    linesData: currentLinesData || [],
-    selectedIdx: selectedIdx || 0
+    linesData: lines,
+    selectedIdx: selectedIdx || 0,
+    selectedKey: selectedKey || (defaultLine ? defaultLine.key : ""),
+    selectedLabel: selectedLabel || (defaultLine ? defaultLine.label : "TỔNG")
   });
 }
 
+function selectKpiStatsSeries(seriesKey) {
+  const current = viewStack[viewStack.length - 1];
+  const foundLine = (current.state.linesData || []).find(l => l.key === seriesKey);
+  if (foundLine) {
+    current.state.selectedKey = foundLine.key;
+    current.state.selectedLabel = foundLine.label;
+    renderKpiStatsTable(current.state);
+  }
+}
+
 function renderKpiStatsTable(state) {
-  const { kpiLabel, labels, linesData, selectedIdx } = state;
-  const primaryLine = linesData[linesData.length - 1] || { points: [] };
+  const { kpiLabel, labels, linesData, selectedIdx, selectedKey, selectedLabel } = state;
+  const activeLine =
+    linesData.find(l => l.key === selectedKey) ||
+    linesData.find(l => l.label === selectedLabel) ||
+    linesData[linesData.length - 1] ||
+    { key: "", label: "TỔNG", points: [] };
+
+  const activePt = activeLine.points[selectedIdx] || {
+    label: labels[selectedIdx] || "",
+    val: 0,
+    labor: 0,
+    qty: 0,
+    st: 0,
+    sales: 0
+  };
+
+  const switcherHtml = linesData.map(line => {
+    const isActive = line.key === activeLine.key;
+    return `
+      <button
+        type="button"
+        class="btn ${isActive ? "btn-ok" : ""}"
+        style="border:1px solid ${line.color}; background:${isActive ? line.color : "#ffffff"}; color:${isActive ? "#ffffff" : line.color}; font-weight:700;"
+        onclick="selectKpiStatsSeries('${line.key}')"
+      >
+        ${line.label}
+      </button>
+    `;
+  }).join("");
+
+  const breakdownRowsHtml = linesData.map(line => {
+    const pt = line.points[selectedIdx] || { val: 0, labor: 0, qty: 0, st: 0, sales: 0 };
+    const isRowSelected = line.key === activeLine.key;
+    return `
+      <tr style="${isRowSelected ? "background:#eff6ff; font-weight:700;" : "cursor:pointer;"}" onclick="selectKpiStatsSeries('${line.key}')">
+        <td class="text-left" style="color:${line.color}; font-weight:700;">
+          ${isRowSelected ? "▶ " : ""}${line.label}
+        </td>
+        <td>${formatNum(pt.labor)}</td>
+        <td>${formatNum(pt.qty)}</td>
+        <td>${formatDec(pt.st, 2)}</td>
+        <td>${formatDec(pt.sales, 2)}</td>
+        <td class="fw-bold val-blue">${formatDec(pt.val, 2)}</td>
+      </tr>
+    `;
+  }).join("");
 
   const headerCols = labels.map((lbl, i) =>
-    `<th style="${i === selectedIdx ? 'background:#0284c7;' : ''}">${lbl}</th>`
+    `<th style="${i === selectedIdx ? "background:#0284c7; color:#fff;" : ""}">${lbl}</th>`
   ).join("");
 
-  const laborCols = primaryLine.points.map(p => `<td>${formatNum(p.labor)}</td>`).join("");
-  const qtyCols = primaryLine.points.map(p => `<td>${formatNum(p.qty)}</td>`).join("");
-  const stCols = primaryLine.points.map(p => `<td>${formatDec(p.st, 2)}</td>`).join("");
-  const salesCols = primaryLine.points.map(p => `<td>${formatDec(p.sales, 2)}</td>`).join("");
-  const spCols = primaryLine.points.map(p => `<td class="fw-bold val-blue">${formatDec(p.val, 2)}</td>`).join("");
+  const laborCols = activeLine.points.map((p, i) =>
+    `<td style="${i === selectedIdx ? "background:#eff6ff; font-weight:700;" : ""}">${formatNum(p.labor)}</td>`
+  ).join("");
+  const qtyCols = activeLine.points.map((p, i) =>
+    `<td style="${i === selectedIdx ? "background:#eff6ff; font-weight:700;" : ""}">${formatNum(p.qty)}</td>`
+  ).join("");
+  const stCols = activeLine.points.map((p, i) =>
+    `<td style="${i === selectedIdx ? "background:#eff6ff; font-weight:700;" : ""}">${formatDec(p.st, 2)}</td>`
+  ).join("");
+  const salesCols = activeLine.points.map((p, i) =>
+    `<td style="${i === selectedIdx ? "background:#eff6ff; font-weight:700;" : ""}">${formatDec(p.sales, 2)}</td>`
+  ).join("");
+  const spCols = activeLine.points.map((p, i) =>
+    `<td class="fw-bold val-blue" style="${i === selectedIdx ? "background:#dbeafe;" : ""}">${formatDec(p.val, 2)}</td>`
+  ).join("");
 
   document.getElementById("appMain").innerHTML = `
     <div class="view-container">
       <div class="view-header">
-        <div class="view-title">BẢNG THỐNG KÊ CHI TIẾT - ${kpiLabel.toUpperCase()}</div>
+        <div class="view-title">
+          CHI TIẾT ${activeLine.label} (${activePt.label || labels[selectedIdx] || ""}) - ${kpiLabel.toUpperCase()}
+        </div>
         <button class="btn btn-ok" onclick="popView()">OK</button>
       </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; align-items:center;">
+        <span style="font-weight:700; color:#334155;">Chọn hạng mục:</span>
+        ${switcherHtml}
+      </div>
+
+      <div class="table-wrap" style="margin-bottom:16px;">
+        <table class="po-detail-table">
+          <thead>
+            <tr>
+              <th>Hạng mục tại mốc ${activePt.label || labels[selectedIdx] || ""}</th>
+              <th>Tổng nhân lực</th>
+              <th>SUM 수량</th>
+              <th>SUM ST</th>
+              <th>SUM SALES ($)</th>
+              <th>SALES PERSON</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${breakdownRowsHtml}
+          </tbody>
+        </table>
+      </div>
+
       <div class="table-wrap">
         <table class="po-detail-table">
           <thead>
             <tr>
-              <th>Chỉ tiêu thống kê (${primaryLine.label || "TỔNG"})</th>
+              <th>Chuỗi dữ liệu (${activeLine.label})</th>
               ${headerCols}
             </tr>
           </thead>
@@ -2199,5 +2294,298 @@ async function handleSaveInput() {
 
 initApp();
 </script>
+<!-- Bộ chuyển đổi ngôn ngữ VI / KO (Offline siêu nhanh - Không lỗi CORS - Không đơ) -->
+<div id="i18nSwitcherBox" class="i18n-tab-bar" role="tablist" aria-label="Language switcher">
+  <button type="button" id="i18nTabVi" class="i18n-lang-tab" data-lang="vi" role="tab" aria-selected="true">
+    VI
+  </button>
+  <button type="button" id="i18nTabKo" class="i18n-lang-tab" data-lang="ko" role="tab" aria-selected="false">
+    KO
+  </button>
+</div>
+<style>
+  .i18n-tab-bar {
+    position: fixed;   /* Ghim cố định lên góc màn hình để không bị trôi xuống đáy trang */
+    top: 100px;         /* Khoảng cách từ mép trên (tăng/giảm để chỉnh cao/thấp) */
+    right: 16px;       /* Khoảng cách từ mép phải (tăng/giảm để chỉnh trái/phải) */
+    z-index: 99999;    /* Luôn nổi trên cùng, không bị thanh tiêu đề che */
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;          /* Khoảng cách giữa tab VI và tab KO */
+    margin: 0;
+  }
+
+  .i18n-lang-tab {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .i18n-lang-tab:hover {
+    border-color: #64748b;
+    background: #f1f5f9;
+  }
+
+  .i18n-lang-tab.is-active {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25);
+  }
+</style>
+<script>
+(function () {
+  const STORAGE_KEY = "sr_sub_ui_lang";
+
+  // 1. Từ điển Việt -> Hàn chuẩn thuật ngữ nhà máy (bổ sung thêm cụm từ của app tại đây)
+  const DICT_VI_TO_KO = {
+    "Ngôn ngữ": "언어",
+    "Ngôn ngữ:": "언어:",
+    "HỆ THỐNG QUẢN LÝ SẢN XUẤT SUB - SR TECH VINA": "SUB 생산 관리 시스템 - SR TECH VINA",
+    "RANKING SX SUB": "SUB 생산 랭킹",
+    "KPI SX SUB": "SUB 생산 KPI",
+    "NHẬP DỮ LIỆU": "데이터 입력",
+    "NHẬP DỮ LIỆU SẢN XUẤT": "생산 데이터 입력",
+    "Hạng mục": "항목",
+    "Mục tiêu": "목표",
+    "Kết quả": "실적",
+    "Hiệu suất": "효율",
+    "Tỷ lệ đạt": "달성률",
+    "Tỷ lệ lỗi": "불량률",
+    "Sản lượng": "생산량",
+    "Kế hoạch": "계획",
+    "Thực tế": "실적",
+    "Chênh lệch": "차이",
+    "Tổng cộng": "합계",
+    "Tổng": "합계",
+    "Ngày": "일별",
+    "Tuần": "주별",
+    "Tháng": "월별",
+    "Năm": "연도",
+    "Chọn ngày": "날짜 선택",
+    "Chọn tháng": "월 선택",
+    "Chọn tuần": "주 선택",
+    "Chuyền": "라인",
+    "Công đoạn": "공정",
+    "Nhân viên": "작업자",
+    "Xếp hạng": "순위",
+    "Trạng thái": "상태",
+    "Đạt": "달성",
+    "Không đạt": "미달성",
+    "Sớm ra mắt": "곧 출시 예정",
+    "Tải file Excel Tổng": "전체 Excel 파일 업로드",
+    "Tải file Dữ liệu gốc KPI": "KPI 원본 데이터 파일 업로드",
+    "Chọn ngày nhập dữ liệu": "데이터 입력일 선택",
+    "Sheet lưu trữ trong Excel": "Excel 저장 시트",
+    "Tải Excel riêng cho": "별도 Excel 업로드:",
+    "Chọn file": "파일 선택",
+    "Xuất Excel": "Excel 내보내기",
+    "Nhập Excel": "Excel 가져오기",
+    "Tải mẫu": "양식 다운로드",
+    "Sửa": "수정",
+    "Xóa": "삭제",
+    "Lưu": "저장",
+    "Hủy": "취소",
+    "Cập nhật": "업데이트",
+    "Tìm kiếm": "검색",
+    "Lọc": "필터",
+    "Tất cả": "전체",
+    "Nhập Plan": "Plan 입력",
+    "Nhập OK": "OK 입력",
+    "Nhập NG": "NG 입력",
+    "Ghi chú": "비고"
+  };
+
+  // Sắp xếp khóa dài trước để ưu tiên khớp cụm từ dài
+  const SORTED_KEYS = Object.keys(DICT_VI_TO_KO).sort((a, b) => b.length - a.length);
+
+  const originalTextMap = new WeakMap();
+  const originalAttrMap = new WeakMap();
+
+  let currentLang = localStorage.getItem(STORAGE_KEY) || "vi";
+  let isMutating = false;
+  let observerTimer = null;
+
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function translateTextSync(rawText) {
+    if (!rawText || !rawText.trim()) return rawText;
+
+    const leading = (rawText.match(/^\s*/) || [""])[0];
+    const trailing = (rawText.match(/\s*$/) || [""])[0];
+    const core = rawText.trim();
+
+    // Khớp chính xác toàn bộ chuỗi
+    if (DICT_VI_TO_KO[core]) {
+      return leading + DICT_VI_TO_KO[core] + trailing;
+    }
+
+    // Khớp không phân biệt hoa thường
+    const lowerCore = core.toLowerCase();
+    for (const k of SORTED_KEYS) {
+      if (k.toLowerCase() === lowerCore) {
+        return leading + DICT_VI_TO_KO[k] + trailing;
+      }
+    }
+
+    // Thay thế cụm từ con nếu có chứa tiếng Việt
+    if (/[À-ỹ]/.test(core)) {
+      let replaced = core;
+      for (const k of SORTED_KEYS) {
+        if (!/[À-ỹ]/.test(k)) continue;
+        const regex = new RegExp(escapeRegExp(k), "gi");
+        replaced = replaced.replace(regex, DICT_VI_TO_KO[k]);
+      }
+      return leading + replaced + trailing;
+    }
+
+    return rawText;
+  }
+
+  function shouldSkipNode(node) {
+    const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    if (!el) return true;
+    return Boolean(
+      el.closest("#i18nSwitcherBox") ||
+      el.closest("script, style, noscript, textarea, select, code, pre, [data-no-i18n], [data-input-template]") ||
+      el.isContentEditable
+    );
+  }
+
+  function processTextNode(node, lang) {
+    if (shouldSkipNode(node)) return;
+
+    if (!originalTextMap.has(node)) {
+      originalTextMap.set(node, node.nodeValue);
+    }
+    const viOriginal = originalTextMap.get(node);
+
+    const targetValue = lang === "vi" ? viOriginal : translateTextSync(viOriginal);
+    if (node.nodeValue !== targetValue) {
+      node.nodeValue = targetValue;
+    }
+  }
+
+  function processAttributes(el, lang) {
+    if (shouldSkipNode(el)) return;
+    const attrs = ["placeholder", "title", "aria-label"];
+
+    if (!originalAttrMap.has(el)) {
+      const saved = {};
+      attrs.forEach((a) => {
+        if (el.hasAttribute(a)) saved[a] = el.getAttribute(a);
+      });
+      originalAttrMap.set(el, saved);
+    }
+
+    const saved = originalAttrMap.get(el);
+    for (const a of attrs) {
+      if (!(a in saved)) continue;
+      const viVal = saved[a];
+      const targetVal = lang === "vi" ? viVal : translateTextSync(viVal);
+      if (el.getAttribute(a) !== targetVal) {
+        el.setAttribute(a, targetVal);
+      }
+    }
+  }
+
+  function applyLanguageToRoot(root, lang) {
+    if (!root) return;
+    isMutating = true;
+    try {
+      if (root.nodeType === Node.TEXT_NODE) {
+        processTextNode(root, lang);
+        return;
+      }
+      if (root.nodeType === Node.ELEMENT_NODE) {
+        processAttributes(root, lang);
+      }
+
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+        null
+      );
+
+      let current;
+      while ((current = walker.nextNode())) {
+        if (current.nodeType === Node.TEXT_NODE) {
+          processTextNode(current, lang);
+        } else if (current.nodeType === Node.ELEMENT_NODE) {
+          processAttributes(current, lang);
+        }
+      }
+    } finally {
+      isMutating = false;
+    }
+  }
+
+  function updateSwitcherUI(lang) {
+    const isKo = lang === "ko";
+    const tabVi = document.getElementById("i18nTabVi");
+    const tabKo = document.getElementById("i18nTabKo");
+
+    if (tabVi) {
+      tabVi.classList.toggle("is-active", !isKo);
+      tabVi.setAttribute("aria-selected", String(!isKo));
+    }
+    if (tabKo) {
+      tabKo.classList.toggle("is-active", isKo);
+      tabKo.setAttribute("aria-selected", String(isKo));
+    }
+
+    document.documentElement.setAttribute("lang", lang);
+  }
+
+  function setLanguage(lang) {
+    if (lang !== "vi" && lang !== "ko") lang = "vi";
+    currentLang = lang;
+    localStorage.setItem(STORAGE_KEY, currentLang);
+    updateSwitcherUI(currentLang);
+    applyLanguageToRoot(document.body, currentLang);
+  }
+
+  const observer = new MutationObserver(() => {
+    if (isMutating || currentLang === "vi") return;
+    clearTimeout(observerTimer);
+    observerTimer = setTimeout(() => {
+      applyLanguageToRoot(document.body, currentLang);
+    }, 50);
+  });
+
+  function initI18n() {
+    document.querySelectorAll("#i18nSwitcherBox .i18n-lang-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetLang = btn.getAttribute("data-lang");
+        if (targetLang && targetLang !== currentLang) {
+          setLanguage(targetLang);
+        }
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+    setLanguage(currentLang);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initI18n);
+  } else {
+    initI18n();
+  }
+})();
+</script>
+
 </body>
 </html>
