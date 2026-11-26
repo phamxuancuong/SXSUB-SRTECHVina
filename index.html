@@ -459,6 +459,32 @@ function loadKpiFromStorageOrFallback() {
   return JSON.parse(JSON.stringify(EMBEDDED_KPI_FALLBACK));
 }
 
+let statusClockTimer = null;
+
+function formatLiveDateTime(date = new Date()) {
+  const pad = n => String(n).padStart(2, "0");
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const seconds = pad(date.getSeconds());
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = date.getFullYear();
+  return `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`;
+}
+
+function startLiveStatusBadge(prefixText = "Online") {
+  const badge = document.getElementById("connStatus");
+  if (!badge) return;
+
+  const renderText = () => {
+    badge.textContent = `${prefixText} | ${formatLiveDateTime()}`;
+  };
+
+  renderText();
+  if (statusClockTimer) clearInterval(statusClockTimer);
+  statusClockTimer = setInterval(renderText, 1000);
+}
+
 async function initApp() {
   const badge = document.getElementById("connStatus");
   if (window.location.protocol === "file:") {
@@ -473,7 +499,7 @@ async function initApp() {
     DB = data;
     KPI_DB = loadKpiFromStorageOrFallback();
     isServerMode = true;
-    badge.textContent = "Đã kết nối Excel (Dữ liệu gốc.xlsx)";
+    startLiveStatusBadge("Online");
   } catch (e) {
     loadOfflineMode(badge);
   }
@@ -485,7 +511,7 @@ function loadOfflineMode(badge) {
   DB = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(EMBEDDED_FALLBACK));
   KPI_DB = loadKpiFromStorageOrFallback();
   isServerMode = false;
-  badge.textContent = "Chế độ xem Offline (HTML độc lập)";
+  startLiveStatusBadge("Online");
   switchTab("tab1");
 }
 
