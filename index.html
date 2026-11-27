@@ -74,12 +74,13 @@
 
     /* TOP TABS */
     nav.top-tabs {
-      display: flex;
-      background: #f1f5f9;
-      border-bottom: 2px solid #cbd5e1;
-      padding: 0 24px;
-      gap: 6px;
-    }
+     display: flex;
+     align-items: center; /* Căn giữa theo chiều dọc cho toàn bộ nội dung trên thanh tab */
+     background: #f1f5f9;
+     border-bottom: 2px solid #cbd5e1;
+     padding: 0 24px;
+     gap: 6px;
+   }
 
     .tab-btn {
       padding: 12px 24px;
@@ -415,7 +416,16 @@
     <button class="tab-btn active" data-tab="tab1" onclick="switchTab('tab1')">RANKING SX SUB</button>
     <button class="tab-btn" data-tab="tab2" onclick="switchTab('tab2')">KPI SX SUB</button>
     <button class="tab-btn" data-tab="tab3" onclick="switchTab('tab3')">NHẬP DỮ LIỆU</button>
-  </nav>
+    <!-- Bộ chuyển đổi ngôn ngữ VI / KO (Offline siêu nhanh - Không lỗi CORS - Không đơ) -->
+    <div id="i18nSwitcherBox" class="i18n-tab-bar" role="tablist" aria-label="Language switcher">
+    <button type="button" id="i18nTabVi" class="i18n-lang-tab" data-lang="vi" role="tab" aria-selected="true">
+    VI
+   </button>
+   <button type="button" id="i18nTabKo" class="i18n-lang-tab" data-lang="ko" role="tab" aria-selected="false">
+    KO
+  </button>
+</div>
+</nav>
 
   <!-- MAIN VIEWPORT -->
   <main id="appMain"></main>
@@ -2366,25 +2376,14 @@ async function handleSaveInput() {
 
 initApp();
 </script>
-<!-- Bộ chuyển đổi ngôn ngữ VI / KO (Offline siêu nhanh - Không lỗi CORS - Không đơ) -->
-<div id="i18nSwitcherBox" class="i18n-tab-bar" role="tablist" aria-label="Language switcher">
-  <button type="button" id="i18nTabVi" class="i18n-lang-tab" data-lang="vi" role="tab" aria-selected="true">
-    VI
-  </button>
-  <button type="button" id="i18nTabKo" class="i18n-lang-tab" data-lang="ko" role="tab" aria-selected="false">
-    KO
-  </button>
-</div>
+
 <style>
   .i18n-tab-bar {
-    position: fixed;   /* Ghim cố định lên góc màn hình để không bị trôi xuống đáy trang */
-    top: 100px;         /* Khoảng cách từ mép trên (tăng/giảm để chỉnh cao/thấp) */
-    right: 16px;       /* Khoảng cách từ mép phải (tăng/giảm để chỉnh trái/phải) */
-    z-index: 99999;    /* Luôn nổi trên cùng, không bị thanh tiêu đề che */
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;          /* Khoảng cách giữa tab VI và tab KO */
-    margin: 0;
+   margin-left: auto;   /* Đẩy cụm VI / KO sát sang mép phải của thanh tab */
+   align-self: center;  /* Luôn nằm chính giữa chiều dọc thanh tab ở mọi màn hình */
+   display: inline-flex;
+   align-items: center;
+   gap: 4px;
   }
 
   .i18n-lang-tab {
