@@ -5,15 +5,16 @@ const path = require("path");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Cho phép lưu file JSON lớn khi import Excel nhiều ngày/nhiều PO
 app.use(express.json({ limit: "25mb" }));
 
-// Hỗ trợ dùng Render Persistent Disk qua biến môi trường DATA_DIR (mặc định là thư mục hiện tại)
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 const DATA_FILE = path.join(DATA_DIR, "data.json");
 const KPI_FILE = path.join(DATA_DIR, "kpi_data.json");
 
-// Khởi tạo file JSON nếu chưa có
+const GH_TOKEN = process.env.GITHUB_TOKEN || "";
+const GH_REPO = process.env.GITHUB_REPO || "phamxuancuong/SXSUB-SRTECHVina";
+const GH_BRANCH = process.env.GITHUB_BRANCH || "main";
+
 function ensureJsonFile(filePath, defaultObj) {
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, JSON.stringify(defaultObj, null, 2), "utf8");
@@ -47,7 +48,6 @@ ensureJsonFile(KPI_FILE, {
   }
 });
 
-// Ghi file an toàn (ghi file tạm rồi rename để tránh hỏng JSON nếu mất điện/restart)
 function writeJsonAtomic(filePath, payload) {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -58,7 +58,45 @@ function writeJsonAtomic(filePath, payload) {
   fs.renameSync(tmpPath, filePath);
 }
 
-// API đọc dữ liệu
+async function pushFileToGitHub(repoFilePath, jsonPayload, commitMessage) {
+  if (!GH_TOKEN || !GH_REPO) return { synced: false, reason: "Chưa cấu hình GITHUB_TOKEN" };
+
+  const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${repoFilePath}`;
+  const headers = {
+    "Authorization": `Bearer ${GH_TOKEN}`,
+    "Accept": "application/vnd.github+json",
+    "Content-Type": "application/json",
+    "User-Agent": "sr-tech-sub-server"
+  };
+
+  let sha = undefined;
+  const getResp = await fetch(`${apiUrl}?ref=${encodeURIComponent(GH_BRANCH)}`, { headers });
+  if (getResp.ok) {
+    const currentMeta = await getResp.json();
+    sha = currentMeta.sha;
+  }
+
+  const contentBase64 = Buffer.from(JSON.stringify(jsonPayload, null, 2), "utf8").toString("base64");
+  const body = {
+    message: commitMessage,
+    content: contentBase64,
+    branch: GH_BRANCH
+  };
+  if (sha) body.sha = sha;
+
+  const putResp = await fetch(apiUrl, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(body)
+  });
+
+  if (!putResp.ok) {
+    const errText = await putResp.text();
+    throw new Error(`GitHub API ${putResp.status}: ${errText}`);
+  }
+  return { synced: true };
+}
+
 app.get("/api/data", (req, res) => {
   try {
     const db = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
@@ -69,8 +107,7 @@ app.get("/api/data", (req, res) => {
   }
 });
 
-// API lưu toàn bộ hoặc từng phần (db / kpi)
-app.post("/api/save", (req, res) => {
+app.post("/api/save", async (req, res) => {
   try {
     const { db, kpi } = req.body || {};
     if (db && typeof db === "object") {
@@ -79,13 +116,36 @@ app.post("/api/save", (req, res) => {
     if (kpi && typeof kpi === "object") {
       writeJsonAtomic(KPI_FILE, kpi);
     }
-    res.json({ ok: true, savedAt: new Date().toISOString() });
+
+    const warnings = [];
+    if (GH_TOKEN) {
+      if (db && typeof db === "object") {
+        try {
+          await pushFileToGitHub("data.json", db, "Update data.json from web app");
+        } catch (e) {
+          warnings.push("data.json: " + e.message);
+        }
+      }
+      if (kpi && typeof kpi === "object") {
+        try {
+          await pushFileToGitHub("kpi_data.json", kpi, "Update kpi_data.json from web app");
+        } catch (e) {
+          warnings.push("kpi_data.json: " + e.message);
+        }
+      }
+    }
+
+    res.json({
+      ok: true,
+      githubSynced: Boolean(GH_TOKEN) && warnings.length === 0,
+      warnings,
+      savedAt: new Date().toISOString()
+    });
   } catch (err) {
     res.status(500).json({ error: "Lỗi lưu dữ liệu: " + err.message });
   }
 });
 
-// Phục vụ file tĩnh (index.html, logo.jpg, v.v.)
 app.use(express.static(__dirname));
 
 app.get("*", (req, res) => {
@@ -95,4 +155,5 @@ app.get("*", (req, res) => {
 app.listen(PORT, () => {
   console.log(`SR TECH VINA server running at http://localhost:${PORT}`);
   console.log(`Data directory: ${DATA_DIR}`);
+  console.log(`GitHub sync enabled: ${Boolean(GH_TOKEN)}`);
 });
