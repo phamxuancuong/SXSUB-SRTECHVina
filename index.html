@@ -446,17 +446,44 @@ let KPI_DB = null;
 let isServerMode = false;
 let viewStack = [];
 
+async function syncToServer() {
+  if (!isServerMode) return false;
+  const resp = await fetch("/api/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ db: DB, kpi: KPI_DB })
+  });
+  if (!resp.ok) throw new Error("Lưu lên server thất bại");
+  return true;
+}
+
 function loadKpiFromStorageOrFallback() {
   try {
     const savedKpi = localStorage.getItem("SR_SUB_KPI_DB");
     if (savedKpi) {
       const parsed = JSON.parse(savedKpi);
-      if (parsed && parsed.version === EMBEDDED_KPI_FALLBACK.version && parsed.sections && parsed.sections.SUB && parsed.sections.SUB.length > 10) {
+      if (parsed && parsed.sections) {
         return parsed;
       }
     }
   } catch (e) {}
-  return JSON.parse(JSON.stringify(EMBEDDED_KPI_FALLBACK));
+  return {
+    version: 1,
+    sections: {
+      FRONT: [],
+      PRE_FRONT: [],
+      BGL_SUB_UB: [],
+      OTHER: [],
+      SUB: [],
+      MOLDING: [],
+      G_TOTAL: []
+    },
+    targets: {
+      sub_week: 28,
+      total_week: 30,
+      next_week_target: "30"
+    }
+  };
 }
 
 let statusClockTimer = null;
@@ -494,12 +521,14 @@ async function initApp() {
   try {
     const resp = await fetch("/api/data");
     if (!resp.ok) throw new Error("Server offline");
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-    DB = data;
-    KPI_DB = loadKpiFromStorageOrFallback();
+    const payload = await resp.json();
+    if (payload.error) throw new Error(payload.error);
+    DB = payload.db || JSON.parse(JSON.stringify(EMBEDDED_FALLBACK));
+    KPI_DB = payload.kpi || loadKpiFromStorageOrFallback();
+    localStorage.setItem("SR_SUB_OFFLINE_DB", JSON.stringify(DB));
+    localStorage.setItem("SR_SUB_KPI_DB", JSON.stringify(KPI_DB));
     isServerMode = true;
-    startLiveStatusBadge("Online");
+    startLiveStatusBadge("Server Online");
   } catch (e) {
     loadOfflineMode(badge);
   }
@@ -2044,7 +2073,7 @@ function handleKpiExcelUpload(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const data = new Uint8Array(e.target.result);
       const workbook = XLSX.read(data, { type: "array" });
@@ -2055,17 +2084,18 @@ function handleKpiExcelUpload(event) {
 
       const parsedSections = parseKpiSheet(workbook.Sheets[targetSheetName]);
       KPI_DB = {
-        version: EMBEDDED_KPI_FALLBACK.version,
+        version: 1,
         sections: parsedSections,
-        targets: KPI_DB?.targets || EMBEDDED_KPI_FALLBACK.targets
+        targets: KPI_DB?.targets || { sub_week: 28, total_week: 30, next_week_target: "30" }
       };
       localStorage.setItem("SR_SUB_KPI_DB", JSON.stringify(KPI_DB));
+      await syncToServer();
 
       if (fb) {
         fb.style.display = "block";
         fb.style.background = "#dcfce7";
         fb.style.color = "#15803d";
-        fb.textContent = `Đã đồng bộ thành công dữ liệu KPI từ file ${file.name} (sheet: ${targetSheetName})!`;
+        fb.textContent = `Đã lưu dữ liệu KPI lên server từ file ${file.name} (sheet: ${targetSheetName})!`;
       }
       switchTab("tab2");
     } catch (err) {
@@ -2074,7 +2104,7 @@ function handleKpiExcelUpload(event) {
         fb.style.display = "block";
         fb.style.background = "#fee2e2";
         fb.style.color = "#b91c1c";
-        fb.textContent = "Lỗi khi đọc file Dữ liệu gốc KPI: " + err.message;
+        fb.textContent = "Lỗi khi đọc/lưu Dữ liệu gốc KPI: " + err.message;
       }
     }
   };
@@ -2094,9 +2124,6 @@ function handleCancelInput() {
   if (fb) fb.style.display = "none";
 }
 
-/* =========================================================================
-   HÀM XỬ LÝ ĐỌC FILE EXCEL (TỔNG VÀ TỪNG MỤC) - HỖ TRỢ BẢNG XOAY NGANG
-   ========================================================================= */
 function normalizePoRows(sheet) {
   const rows = XLSX.utils.sheet_to_json(sheet);
   return rows.map(row => {
@@ -2125,11 +2152,11 @@ function handleMasterExcelUpload(event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      
+      const workbook = XLSX.read(data, { type: "array" });
+
       let updatedCount = 0;
       workbook.SheetNames.forEach(sheetName => {
         const sheet = workbook.Sheets[sheetName];
@@ -2166,11 +2193,12 @@ function handleMasterExcelUpload(event) {
       });
 
       localStorage.setItem("SR_SUB_OFFLINE_DB", JSON.stringify(DB));
+      await syncToServer();
       if (fb) {
         fb.style.display = "block";
         fb.style.background = "#dcfce7";
         fb.style.color = "#15803d";
-        fb.textContent = `Đã đồng bộ thành công dữ liệu tổng từ file ${file.name} (${updatedCount} sheet khớp)!`;
+        fb.textContent = `Đã lưu dữ liệu tổng lên server từ file ${file.name} (${updatedCount} sheet khớp)!`;
       }
       switchTab("tab1");
     } catch (err) {
@@ -2179,7 +2207,7 @@ function handleMasterExcelUpload(event) {
         fb.style.display = "block";
         fb.style.background = "#fee2e2";
         fb.style.color = "#b91c1c";
-        fb.textContent = "Lỗi khi đọc file Excel tổng: " + err.message;
+        fb.textContent = "Lỗi khi đọc/lưu file Excel tổng: " + err.message;
       }
     }
   };
@@ -2192,10 +2220,10 @@ function handleCategoryExcelUpload(catKey, event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
+  reader.onload = async function(e) {
     try {
       const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
+      const workbook = XLSX.read(data, { type: "array" });
       const firstSheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[firstSheetName];
       const parsedJson = parseHorizontalSheet(sheet);
@@ -2203,11 +2231,12 @@ function handleCategoryExcelUpload(catKey, event) {
       if (parsedJson.length > 0) {
         DB[catKey] = parsedJson;
         localStorage.setItem("SR_SUB_OFFLINE_DB", JSON.stringify(DB));
+        await syncToServer();
         if (fb) {
           fb.style.display = "block";
           fb.style.background = "#dcfce7";
           fb.style.color = "#15803d";
-          fb.textContent = `Đã cập nhật thành công dữ liệu cho mục [${catKey}] từ file ${file.name} (${parsedJson.length} ngày)!`;
+          fb.textContent = `Đã lưu lên server dữ liệu mục [${catKey}] từ file ${file.name} (${parsedJson.length} ngày)!`;
         }
         switchTab("tab1");
       } else {
@@ -2219,13 +2248,12 @@ function handleCategoryExcelUpload(catKey, event) {
         fb.style.display = "block";
         fb.style.background = "#fee2e2";
         fb.style.color = "#b91c1c";
-        fb.textContent = "Lỗi khi đọc file Excel hạng mục: " + err.message;
+        fb.textContent = "Lỗi khi đọc/lưu file Excel hạng mục: " + err.message;
       }
     }
   };
   reader.readAsArrayBuffer(file);
 }
-
 async function handleSaveInput() {
   const dateVal = document.getElementById("inputDate").value;
   const fb = document.getElementById("saveFeedback");
@@ -2284,7 +2312,6 @@ async function handleSaveInput() {
   });
   localStorage.setItem("SR_SUB_OFFLINE_DB", JSON.stringify(DB));
 
-  // Lưu thêm nếu có nhập tay Sale Per Son SUB / Total
   if (!KPI_DB) KPI_DB = loadKpiFromStorageOrFallback();
   const tSub = document.getElementById("target_sub_sp")?.value;
   const vSub = document.getElementById("val_sub_sp")?.value;
@@ -2323,10 +2350,18 @@ async function handleSaveInput() {
     localStorage.setItem("SR_SUB_KPI_DB", JSON.stringify(KPI_DB));
   }
 
-  fb.style.display = "block";
-  fb.style.background = "#dcfce7";
-  fb.style.color = "#15803d";
-  fb.textContent = "Đã lưu nhập liệu thủ công vào bộ nhớ offline trình duyệt!";
+  try {
+    await syncToServer();
+    fb.style.display = "block";
+    fb.style.background = "#dcfce7";
+    fb.style.color = "#15803d";
+    fb.textContent = "Đã lưu dữ liệu lên server thành công!";
+  } catch (err) {
+    fb.style.display = "block";
+    fb.style.background = "#fef3c7";
+    fb.style.color = "#b45309";
+    fb.textContent = "Đã lưu tạm local, nhưng gửi lên server lỗi: " + err.message;
+  }
   switchTab(kpiChanged ? "tab2" : "tab1");
 }
 
